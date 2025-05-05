@@ -1,21 +1,38 @@
 <script lang="ts">
     import { Input, Button, Label } from "$lib/index";
     import { page } from '$app/stores';
+    import { supabase } from '$lib/supabaseClient'; 
+
   
     let email = '';
     let password = '';
     let error = '';
+
+    async function signInWithGoogle() {
+      try {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`
+          }
+        });
+        if (error) throw error;
+      } catch (error: any) {
+        error = error.message;
+        console.error('Google sign-in error:', error);
+      }
+    }
 </script>
 
-<div class="flex items-center justify-center min-h-[calc(100vh-4rem)] px-4 bg-gray-200">
+<div class="flex items-center justify-center min-h-[calc(100vh-9rem)] px-4">
   <div class="w-full max-w-[400px] mx-auto p-7 bg-white rounded-2xl shadow-lg flex flex-col items-center">
     <h2 class="text-3xl font-bold mb-9 text-center">Log in</h2>
     
     <!-- Google button -->
-    <Button
+    <Button onclick={signInWithGoogle}
       type="button"
       variant="outline"
-      class="w-full h-8 flex items-center justify-center gap-2 bg-gray-50 mb-2">
+      class="w-full h-8 flex items-center justify-center gap-2 mb-2 bg-gray-50">
       <span class="flex items-center">
         <svg class="h-3 w-3" viewBox="0 0 533.5 544.3" xmlns="http://www.w3.org/2000/svg">
           <path fill="#4285F4" d="M533.5 278.4c0-17.4-1.4-34.1-4.1-50.2H272v95h146.9c-6.4 34-25.6 62.7-54.5 82.1v68h87.8c51.4-47.3 81.3-117 81.3-194.9z"/>

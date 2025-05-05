@@ -1,4 +1,4 @@
-import { redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
 export const actions: Actions = {
@@ -9,8 +9,11 @@ export const actions: Actions = {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      console.error(error);
-      throw redirect(303, '/auth/error');
+      let message = error.message;
+      if (message.toLowerCase().includes('invalid login credentials')) {
+        message = "This account doesn't exist";
+      }
+      return fail(400, { error: message });
     } else {
       throw redirect(303, '/dashboard');
     }
