@@ -1,21 +1,11 @@
 <script lang="ts">
 	import '../app.css';
-	import { sessionStore } from '$lib/stores/sessionStore';
-	import { buttonVariants } from "$lib/components/ui/button";
-	import { invalidate, goto } from '$app/navigation';
+	import Navbar from '$lib/components/Navbar.svelte';
+	import { invalidate } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	let { data, children } = $props();
 	let { session, supabase } = data;
-
-	async function signOut() {
-		const { error } = await supabase.auth.signOut();
-		if (error) {
-			console.error('Error signing out:', error);
-		} else {
-			await goto('/');
-			invalidate('supabase:auth');
-		}
-	}
 
 	onMount(() => {
 		const { data: authListener } = supabase.auth.onAuthStateChange((_, newSession) => {
@@ -26,6 +16,10 @@
 		return () => authListener.subscription.unsubscribe();
 	});
 </script>
+
+{#if !$page.url.pathname.startsWith('/dashboard')}
+	<Navbar />
+{/if}
 
 <style>
 	@keyframes gradientMove {
@@ -95,41 +89,6 @@
 <div class="bg-blob blob2"></div>
 <div class="bg-blob blob3"></div>
 
-<div class="min-h-[calc(100vh-4rem)]">
-	<nav class="flex items-center justify-between border-b border-transparent px-8 py-5 bg-transparent">
-	<!-- Left: Brand/Logo -->
-		<div class="flex items-center gap-2">
-			<a
-				href="/"
-				class="text-xl font-bold tracking-tight text-gray-800 transition hover:text-blue-600">
-				AudioBrew
-			</a>
-		</div>
-
-	<!-- Right: Signup button -->
-
-		{#if $sessionStore}
-			<div class="flex items-center gap-3">
-				<span class="font-medium text-gray-700">
-					{$sessionStore.user.user_metadata.display_name}
-				</span>
-				<button
-					onclick={signOut}
-					class={buttonVariants({ variant: "outline" })}
-					type="button">
-					Sign out
-				</button>
-			</div>
-		{:else}
-			<div class="flex gap-2">
-				<a href="/login" class={buttonVariants({ variant: "outline" })}>
-					Login
-				</a>
-				<a href="/signup" class={buttonVariants({ variant: "default" })}>
-					Sign up
-				</a>
-			</div>
-		{/if}
-	</nav>
+<div>
 	{@render children()}
 </div>
