@@ -18,8 +18,20 @@ const supabase: Handle = async ({ event, resolve }) => {
   event.locals.safeGetSession = async () => {
     const { data: { session } } = await event.locals.supabase.auth.getSession();
     if (!session) return { session: null, user: null };
+    
     const { data: { user }, error } = await event.locals.supabase.auth.getUser();
     if (error) return { session: null, user: null };
+    
+    // Log the user metadata to debug avatar issues
+    if (user) {
+      console.log('Server: User metadata in safeGetSession:', user.user_metadata);
+      
+      // Make sure we're not losing any metadata fields, especially avatar_url
+      if (session) {
+        session.user.user_metadata = user.user_metadata;
+      }
+    }
+    
     return { session, user };
   };
 
