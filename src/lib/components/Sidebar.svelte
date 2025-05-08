@@ -111,7 +111,7 @@
     <!-- Sidebar -->
     <aside
       class={`transition-all duration-500 ease-in-out bg-gray-50 shadow h-full flex flex-col
-        ${sidebarOpen ? 'w-[220px]' : 'w-[85px]'} rounded-r-3xl py-6 px-2`}
+        ${sidebarOpen ? 'w-[250px]' : 'w-[85px]'} rounded-r-3xl py-6 px-2`}
       onmouseenter={() => (sidebarOpen = true)}
       onmouseleave={() => (sidebarOpen = false)}
     >
