@@ -92,7 +92,7 @@
             bind:value={displayName} 
             maxlength={MAX_NAME_LENGTH}
             required
-            class="block w-full p-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+            class="bg-white/40 backdrop-blur-sm block w-full p-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
         />
         <div class="flex justify-between items-center mt-1">
             <span class="text-sm text-gray-500">Change your name</span>

@@ -12,43 +12,35 @@ export function getProfileImageSrc(imagePreview: string | null = null) {
     // Priority 0: First check if there's a preview from a newly selected image
     // This is important for immediate feedback during upload
     if (imagePreview) {
-        console.log('ProfilePage: Using local preview image');
         return imagePreview;
     }
     
     if (!sessionValue?.user) {
-        console.log('ProfilePage: No user in session store, using placeholder');
         return placeholderImage;
     }
     
     // Get avatar URL from user metadata
     const metadata = sessionValue.user.user_metadata;
-    console.log('ProfilePage: User metadata:', metadata);
     
     // Priority 1: Check for our custom avatar URL field that persists across OAuth refreshes
     if (metadata?.custom_avatar_url && metadata.custom_avatar_url.trim() !== '') {
-        console.log('ProfilePage: Using custom avatar URL:', metadata.custom_avatar_url);
         return metadata.custom_avatar_url;
     }
     
     // Priority 2: Check regular avatar_url
     const avatarUrl = metadata?.avatar_url;
-    console.log('ProfilePage: Avatar URL from metadata:', avatarUrl);
     
     if (avatarUrl && avatarUrl.trim() !== '') {
         // Check if this URL is from our Supabase bucket (user uploaded)
         if (avatarUrl.includes('profilepic')) {
-            console.log('ProfilePage: Using Supabase profilepic image:', avatarUrl);
             return avatarUrl;
         }
         
         // Priority 3: OAuth provider avatar URL (Google, etc.)
-        console.log('ProfilePage: Using OAuth provider image:', avatarUrl);
         return avatarUrl;
     }
     
     // Priority 4: Default placeholder if no avatar is available
-    console.log('ProfilePage: No avatar URL found, using placeholder');
     return placeholderImage;
 }
 

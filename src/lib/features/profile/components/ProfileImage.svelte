@@ -36,9 +36,6 @@
         const file = input.files[0];
         profileImage = file;
         
-        // Debug log user data before changes
-        console.log('Before upload - User metadata:', $sessionStore?.user?.user_metadata);
-        
         try {
             // Create preview
             imagePreview = await createImagePreview(file);

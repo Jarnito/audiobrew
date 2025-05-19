@@ -2,10 +2,9 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 /**
- * This route initiates the Gmail OAuth flow by proxying to our FastAPI backend.
- * It returns the authorization URL that the user should be redirected to.
+ * This route disconnects a user's Gmail account by proxying to our FastAPI backend.
  */
-export const GET: RequestHandler = async ({ url, fetch }) => {
+export const DELETE: RequestHandler = async ({ url, fetch }) => {
   // Get user ID from query parameter
   const userId = url.searchParams.get('user_id');
   
@@ -14,19 +13,21 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
   }
   
   try {
-    // Forward the request to our FastAPI backend
-    const response = await fetch(`/api/gmail/auth?user_id=${userId}`);
+    // Forward the delete request to our FastAPI backend
+    const response = await fetch(`/api/gmail/disconnect?user_id=${userId}`, {
+      method: 'DELETE'
+    });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       return json(errorData, { status: response.status });
     }
     
-    // Return the authorization URL from the backend
+    // Return the successful response from the backend
     const data = await response.json();
     return json(data);
   } catch (error) {
-    console.error('Error initiating Gmail auth:', error);
-    return json({ error: 'Failed to initiate Gmail authentication' }, { status: 500 });
+    console.error('Error disconnecting Gmail:', error);
+    return json({ error: 'Failed to disconnect Gmail' }, { status: 500 });
   }
 }; 

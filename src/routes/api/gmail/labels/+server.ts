@@ -2,8 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 /**
- * This route initiates the Gmail OAuth flow by proxying to our FastAPI backend.
- * It returns the authorization URL that the user should be redirected to.
+ * This route fetches Gmail labels for a user
+ * by proxying to our FastAPI backend.
  */
 export const GET: RequestHandler = async ({ url, fetch }) => {
   // Get user ID from query parameter
@@ -15,18 +15,18 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
   
   try {
     // Forward the request to our FastAPI backend
-    const response = await fetch(`/api/gmail/auth?user_id=${userId}`);
+    const response = await fetch(`/api/gmail/labels?user_id=${userId}`);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       return json(errorData, { status: response.status });
     }
     
-    // Return the authorization URL from the backend
+    // Return the labels from the backend
     const data = await response.json();
     return json(data);
   } catch (error) {
-    console.error('Error initiating Gmail auth:', error);
-    return json({ error: 'Failed to initiate Gmail authentication' }, { status: 500 });
+    console.error('Error fetching Gmail labels:', error);
+    return json({ error: 'Failed to fetch Gmail labels' }, { status: 500 });
   }
 }; 

@@ -27,35 +27,28 @@
         if (!mounted) return placeholderImage;
         
         if (!$sessionStore?.user) {
-            console.log('Sidebar: No user in session store, using placeholder');
             return placeholderImage;
         }
         
         const metadata = $sessionStore.user.user_metadata;
-        console.log('Sidebar: User metadata:', metadata);
         
         // Priority 1: Check for custom_avatar_url field that persists across OAuth refreshes
         if (metadata?.custom_avatar_url && metadata.custom_avatar_url.trim() !== '') {
-            console.log('Sidebar: Using custom avatar URL:', metadata.custom_avatar_url);
             return metadata.custom_avatar_url;
         }
         
         // Priority 2: Check regular (Google Auth) avatar_url
         const avatarUrl = metadata?.avatar_url;
-        console.log('Sidebar: Avatar URL from metadata:', avatarUrl);
         
         if (avatarUrl && avatarUrl.trim() !== '') {
-            console.log('Sidebar: Using OAuth provider image:', avatarUrl);
             return avatarUrl;
         }
         
         // Priority 3: Default placeholder if no avatar is available
-        console.log('Sidebar: No avatar URL found, using placeholder');
         return placeholderImage;
     })();
     
     onMount(() => {
-        // Mark as mounted to enable reactive updates
         mounted = true;
     });
     
@@ -107,18 +100,18 @@
     }
   </style>
   
-  <div class="flex h-screen">
+  <div class="fixed top-0 left-0 h-screen z-40">
     <!-- Sidebar -->
     <aside
-      class={`transition-all duration-500 ease-in-out bg-gray-50 shadow h-full flex flex-col
-        ${sidebarOpen ? 'w-[250px]' : 'w-[85px]'} rounded-r-3xl py-6 px-2`}
+      class={`transition-all duration-500 ease-in-out bg-white/15 backdrop-blur-5xl shadow h-full flex flex-col
+        ${sidebarOpen ? 'w-[250px]' : 'w-[85px]'} rounded-r-3xl py-6 px-2 border-r border-gray-200`}
       onmouseenter={() => (sidebarOpen = true)}
       onmouseleave={() => (sidebarOpen = false)}
     >
       <!-- Top: AudioBrew Logo + Text -->
       <div class="flex items-center h-16 mb-10">
         <span class="flex items-center min-w-[70px] w-[50px] justify-center">
-          <img src="/audiobrew_logo.png" alt="AudioBrew Logo" class="w-[50px] h-[50px] object-contain" />
+          <img src="/audiobrew_logo.png" alt="AudioBrew Logo" class="w-[40px] h-[40px] object-contain" />
         </span>
         <span class={`sidebar-label${sidebarOpen ? ' open' : ''}${!sidebarOpen && labelState === 'closing' ? ' closing' : ''} font-bold text-xl tracking-tight text-gray-800`} style="font-family: 'Inter', sans-serif; display: flex; align-items: center; height: 50px;">AudioBrew</span>
       </div>
@@ -126,7 +119,7 @@
       <!-- Navigation -->
       <nav class="flex-1 flex flex-col gap-2">
         <!-- Dashboard -->
-        <a href="/dashboard" class="flex items-center px-3 py-3 hover:bg-gray-300 rounded-lg transition">
+        <a href="/dashboard" class="flex items-center px-3 py-3 hover:bg-gray-300/30 rounded-lg transition-colors duration-200">
           <span class="flex items-center justify-center min-w-[40px] w-[40px] h-6">
             <!-- Dashboard Icon -->
             <svg width="22" height="18" viewBox="0 0 32 32" fill="none"><rect x="3" y="3" width="10" height="10" stroke="black" stroke-width="2" fill="none"/><rect x="19" y="3" width="10" height="10" stroke="black" stroke-width="2" fill="none"/><rect x="3" y="19" width="10" height="10" stroke="black" stroke-width="2" fill="none"/><rect x="19" y="19" width="10" height="10" stroke="black" stroke-width="2" fill="none"/></svg>
@@ -134,7 +127,7 @@
           <span class={`sidebar-label${sidebarOpen ? ' open' : ''}${!sidebarOpen && labelState === 'closing' ? ' closing' : ''}`}>Dashboard</span>
         </a>
         <!-- Profile -->
-        <a href="/dashboard/profile" class="flex items-center px-3 py-3 hover:bg-gray-300 rounded-lg transition">
+        <a href="/dashboard/profile" class="flex items-center px-3 py-3 hover:bg-gray-300/30 rounded-lg transition-colors duration-200">
           <span class="flex items-center justify-center min-w-[40px] w-[40px] h-6">
             <!-- Symmetrical Profile Icon -->
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 8-4 8-4s8 0 8 4"/></svg>
@@ -142,7 +135,7 @@
           <span class={`sidebar-label${sidebarOpen ? ' open' : ''}${!sidebarOpen && labelState === 'closing' ? ' closing' : ''}`}>Profile</span>
         </a>
         <!-- Settings -->
-        <a href="/dashboard/settings" class="flex items-center px-3 py-3 hover:bg-gray-300 rounded-lg transition">
+        <a href="/dashboard/settings" class="flex items-center px-3 py-3 hover:bg-gray-300/30 rounded-lg transition-colors duration-200">
           <span class="flex items-center justify-center min-w-[40px] w-[40px] h-6">
             <!-- Settings Icon (user SVG) -->
             <svg class="feather feather-settings" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -150,7 +143,7 @@
           <span class={`sidebar-label${sidebarOpen ? ' open' : ''}${!sidebarOpen && labelState === 'closing' ? ' closing' : ''}`}>Settings</span>
         </a>
         <!-- Log out -->
-        <button type="button" onclick={signOut} class="flex items-center px-3 py-3 hover:bg-gray-300 rounded-lg transition">
+        <button type="button" onclick={signOut} class="flex items-center px-3 py-3 hover:bg-gray-300/30 rounded-lg transition-colors duration-200">
           <span class="flex items-center justify-center min-w-[40px] w-[40px] h-6">
             <!-- Logout Icon (user SVG) -->
             <svg class="feather feather-log-out" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22" xmlns="http://www.w3.org/2000/svg"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
@@ -165,7 +158,7 @@
           <img 
             src={profileImageSrc} 
             alt="ProfilePicture" 
-            class="w-10 h-10 rounded-full object-cover"
+            class="w-8 h-8 rounded-full object-cover border border-gray-200/50"
             onerror={(e) => {
                 const img = e.currentTarget as HTMLImageElement;
                 img.src = placeholderImage;
