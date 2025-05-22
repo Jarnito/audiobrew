@@ -171,7 +171,8 @@ async def generate_audio_from_text(text: str, user_id: str) -> str:
                     "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
                     "Content-Type": "audio/mpeg"  # Correct MIME type for MP3
                 },
-                content=audio_bytes
+                content=audio_bytes,
+                timeout=60.0
             )
             
             if upload_response.status_code >= 400:

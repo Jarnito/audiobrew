@@ -39,6 +39,20 @@
     let audioElement: HTMLAudioElement;
     let showEmails = false; // Toggle state for showing/hiding emails
     
+    // Variables for audio progress tracking
+    let currentProgress = 0;
+    let audioDuration = 0;
+    let progressInterval: ReturnType<typeof setInterval> | undefined = undefined;
+    let activePlayerPodcast: Podcast | null = null;
+    
+    // Add popover state variable in the script section after other state variables
+    let showPodcastMenuId: string | null = null;
+    
+    // Add after state variables
+    let ellipsis = '';
+    let ellipsisInterval: ReturnType<typeof setInterval> | null = null;
+    
+    
     // Format duration from seconds to MM:SS
     function formatDuration(seconds: number): string {
         const minutes = Math.floor(seconds / 60);
@@ -83,7 +97,7 @@
                 // If label exists, fetch emails
                 await fetchEmailsFromAudioBrewLabel();
             } else {
-                labelMessage = '⚠️ AudioBrew label not found. Please create a label named "AudioBrew" in your Gmail account and add newsletters to it.';
+                labelMessage = '⚠️ AudioBrew label not found. Please create a label named "AudioBrew" in your Gmail account and add newsletters to this label.';
             }
             
         } catch (err) {
@@ -231,11 +245,14 @@
             const emailIds = emails.map(email => email.id);
             
             // Generate a default title
-            const title = `AudioBrew Podcast - ${new Date().toLocaleDateString('en-US', { 
+            // Format: "☕ Brew - May 21, 2025"
+            const today = new Date();
+            const formattedDate = today.toLocaleDateString('en-US', { 
                 year: 'numeric', 
                 month: 'short', 
                 day: 'numeric' 
-            })}`;
+            });
+            const title = `☕ Brew - ${formattedDate}`;
             
             // Call the API to generate the podcast
             const response = await fetch('/api/podcast/generate', {
@@ -314,6 +331,40 @@
         return url;
     }
     
+    // Start tracking audio progress
+    function startProgressTracking() {
+        // Clear any existing interval
+        if (progressInterval) {
+            clearInterval(progressInterval);
+        }
+        
+        // Update progress every 250ms for smooth progress bar
+        progressInterval = setInterval(() => {
+            if (audioElement && !audioElement.paused) {
+                currentProgress = audioElement.currentTime;
+                audioDuration = audioElement.duration || 0;
+            }
+        }, 250);
+    }
+    
+    // Stop tracking audio progress
+    function stopProgressTracking() {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = undefined;
+        }
+    }
+    
+    // Handle seeking in the audio player
+    function handleSeek(event: Event) {
+        if (audioElement && audioDuration > 0) {
+            const target = event.target as HTMLInputElement;
+            const seekTime = parseFloat(target.value);
+            audioElement.currentTime = seekTime;
+            currentProgress = seekTime;
+        }
+    }
+    
     // Play or pause audio
     function toggleAudio(podcast: Podcast): void {
         if (!audioElement) {
@@ -322,12 +373,30 @@
             // Set up event listeners
             audioElement.addEventListener('ended', () => {
                 currentlyPlaying = null;
+                activePlayerPodcast = null;
+                stopProgressTracking();
+                currentProgress = 0;
             });
             
             audioElement.addEventListener('error', () => {
                 currentlyPlaying = null;
+                activePlayerPodcast = null;
+                stopProgressTracking();
                 error = 'Failed to play audio. The file might not be available yet.';
                 setTimeout(() => error = '', 3000);
+            });
+            
+            audioElement.addEventListener('loadedmetadata', () => {
+                audioDuration = audioElement.duration;
+            });
+            
+            audioElement.addEventListener('play', () => {
+                startProgressTracking();
+            });
+            
+            audioElement.addEventListener('pause', () => {
+                // Don't reset progress when paused
+                stopProgressTracking();
             });
         }
         
@@ -335,12 +404,21 @@
         if (currentlyPlaying === podcast.id) {
             audioElement.pause();
             currentlyPlaying = null;
+            // Keep the current progress and podcast
             return;
         }
         
-        // Otherwise, play this podcast
         const audioUrl = getAudioUrl(podcast.audio_url);
-        audioElement.src = audioUrl;
+        
+        // If switching to a new podcast
+        if (activePlayerPodcast?.id !== podcast.id) {
+            // Reset progress and set new src
+            currentProgress = 0;
+            audioElement.src = audioUrl;
+            activePlayerPodcast = podcast;
+        }
+        
+        // Play the audio
         audioElement.play()
             .then(() => {
                 currentlyPlaying = podcast.id;
@@ -375,8 +453,42 @@
         document.body.removeChild(link);
     }
     
+    // Toggle the popover menu
+    function togglePodcastMenu(podcastId: string, event: MouseEvent) {
+        event.stopPropagation();
+        showPodcastMenuId = showPodcastMenuId === podcastId ? null : podcastId;
+    }
+    
+    // Close the menu when clicking outside
+    function handleOutsideClick() {
+        showPodcastMenuId = null;
+    }
+    
     // Set up error display
     $: errorMessage = error ? error : '';
+
+    // In the script section, add a keydown handler for Escape
+    function handleKeyDown(event: KeyboardEvent) {
+        if (event.key === 'Escape') {
+            showPodcastMenuId = null;
+        }
+    }
+
+    $: if (isGenerating) {
+        if (!ellipsisInterval) {
+            let step = 0;
+            ellipsisInterval = setInterval(() => {
+                step = (step + 1) % 4;
+                ellipsis = '.'.repeat(step);
+            }, 400);
+        }
+    } else {
+        if (ellipsisInterval) {
+            clearInterval(ellipsisInterval);
+            ellipsisInterval = null;
+        }
+        ellipsis = '';
+    }
 
     onMount(async () => {
         // Check if user is logged in
@@ -398,6 +510,8 @@
             clearInterval(refreshInterval);
         }
         
+        stopProgressTracking();
+        
         // Clean up audio element
         if (audioElement) {
             audioElement.pause();
@@ -406,7 +520,7 @@
     });
 </script>
 
-<div class="w-full max-w-2xl bg-white/15 backdrop-blur-5xl rounded-3xl shadow-md border border-gray-200 overflow-visible transition-all duration-300 mx-auto my-8">
+<div class="w-full max-w-2xl bg-white/15 backdrop-blur-5xl rounded-3xl shadow-md border border-gray-200 overflow-visible transition-all duration-300 mx-auto my-8" onclick={handleOutsideClick} onkeydown={handleKeyDown} role="presentation" tabindex="-1">
     <div class="p-10 flex flex-col">
         <h1 class="text-3xl font-bold mb-10 text-center">Dashboard</h1>
         
@@ -427,6 +541,7 @@
                             class="flex items-center justify-between w-full text-xs font-medium text-gray-700 bg-gray-50/80 hover:bg-gray-100/80 py-2 px-3 rounded border border-gray-100 transition-colors"
                             onclick={() => showEmails = !showEmails}
                             aria-expanded={showEmails}
+                            aria-label="Toggle email list"
                         >
                             <span>Available emails ({emails.length})</span>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transform transition-transform {showEmails ? 'rotate-180' : ''}" viewBox="0 0 20 20" fill="currentColor">
@@ -435,7 +550,7 @@
                         </button>
                         
                         {#if showEmails}
-                            <div class="mt-2 animate-fadeIn">
+                            <div class="mt-2" transition:fade={{ duration: 150 }}>
                                 <ul class="list-disc pl-5 space-y-1 max-h-32 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50/80 text-xs">
                                     {#each emails as email}
                                         <li class="truncate">{email.subject} <span class="text-gray-500">from {email.from.split('<')[0]}</span></li>
@@ -457,7 +572,7 @@
                     >
                         {#if isGenerating}
                             <span class="inline-block mr-2">☕</span>
-                            Audio is brewing...
+                            Audio is brewing{ellipsis}
                         {:else if isCheckingLabels}
                             Checking...
                         {:else if isLoadingEmails}
@@ -489,7 +604,20 @@
                 {:else}
                     <div class="space-y-3 overflow-visible">
                         {#each podcasts as podcast}
-                            <div class="border border-gray-200/50 rounded-xl p-3 bg-white/50 relative shadow-md">
+                            <div class="border border-gray-200/50 rounded-xl p-3 bg-gradient-to-br from-purple-100/90 to-pink-100/90 backdrop-blur-sm relative shadow-md">
+                                <!-- Three dots menu button at top right -->
+                                <div class="absolute top-3 right-3">
+                                    <button 
+                                        class="text-gray-700 hover:text-gray-900 transition-colors duration-200"
+                                        aria-label="Show podcast options"
+                                        onclick={(e) => togglePodcastMenu(podcast.id, e)}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                
                                 <div class="flex flex-col sm:flex-row gap-3 items-center sm:items-start">
                                     <!-- Podcast Icon/Play Button -->
                                     <div class="flex-shrink-0 self-center">
@@ -509,45 +637,69 @@
                                     </div>
                                     
                                     <!-- Podcast Details -->
-                                    <div class="flex-grow overflow-hidden pr-20 sm:pr-24">
+                                    <div class="flex-grow overflow-hidden pr-6">
                                         <h3 class="font-medium text-base truncate">{podcast.title}</h3>
-                                        <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-                                            <span>Duration: {formatDuration(podcast.duration)}</span>
-                                            <span>Created: {formatDate(podcast.created_at)}</span>
-                                            <span>Sources: {podcast.source_emails} emails</span>
+                                        <div class="text-xs text-gray-500">
+                                            <span>{podcast.source_emails} {podcast.source_emails === 1 ? 'source' : 'sources'}</span>
                                         </div>
+                                        
+                                        <!-- Audio Progress Bar - only show for active podcast -->
+                                        {#if activePlayerPodcast?.id === podcast.id}
+                                            <div class="mt-3 w-full">
+                                                <div class="flex justify-between text-xs text-gray-700 mb-1">
+                                                    <span>{formatDuration(Math.floor(currentProgress))}</span>
+                                                    <span>{formatDuration(Math.floor(audioDuration))}</span>
+                                                </div>
+                                                <input 
+                                                    type="range" 
+                                                    min="0" 
+                                                    max={audioDuration || podcast.duration} 
+                                                    value={currentProgress} 
+                                                    oninput={handleSeek}
+                                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-800"
+                                                />
+                                            </div>
+                                        {/if}
                                     </div>
                                 </div>
-                                
-                                <!-- Actions - Positioned in bottom right -->
-                                <div class="absolute bottom-3 right-3 flex gap-2">
-                                    <button 
-                                        class="text-gray-800 hover:text-black transition-colors duration-200"
-                                        aria-label="Download podcast: {podcast.title}"
-                                        onclick={() => downloadPodcast(podcast)}
+                                {#if showPodcastMenuId === podcast.id}
+                                    <div 
+                                        class="absolute left-full bottom-0 top-auto ml-4 w-12 bg-white/40 backdrop-blur-md rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-[9999] p-1 flex flex-col items-center space-y-2"
+                                        role="menu"
+                                        aria-orientation="vertical"
+                                        aria-labelledby="options-menu"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        </svg>
-                                    </button>
-                                    <button 
-                                        class="text-gray-800 hover:text-black transition-colors duration-200"
-                                        aria-label="Share podcast: {podcast.title}"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-                                        </svg>
-                                    </button>
-                                    <button 
-                                        class="text-gray-800 hover:text-black transition-colors duration-200"
-                                        aria-label="Delete podcast: {podcast.title}"
-                                        onclick={() => deletePodcast(podcast.id)}
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                        </svg>
-                                    </button>
-                                </div>
+                                        <button 
+                                            class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
+                                            role="menuitem"
+                                            aria-label="Download"
+                                            onclick={() => downloadPodcast(podcast)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
+                                            role="menuitem"
+                                            aria-label="Share"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-100 transition-colors"
+                                            role="menuitem"
+                                            aria-label="Delete"
+                                            onclick={() => deletePodcast(podcast.id)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                {/if}
                             </div>
                         {/each}
                     </div>
