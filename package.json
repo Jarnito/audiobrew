@@ -46,6 +46,7 @@
 	"dependencies": {
 		"@supabase/ssr": "^0.6.1",
 		"@supabase/supabase-js": "^2.49.4",
+		"@sveltejs/adapter-vercel": "^5.7.2",
 		"shadcn-svelte": "^0.14.2"
 	}
 }
