@@ -3,5 +3,7 @@
     "api/index.py": {
       "maxDuration": 30
     }
-  }
+  },
+  "buildCommand": "npm run build",
+  "nodeVersion": "18.x"
 } 
