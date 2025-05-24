@@ -12,7 +12,11 @@ app = FastAPI(title="AudioBrew API")
 # Add CORS middleware to allow frontend to call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your actual domain
+    allow_origins=[
+        "https://audiobrew.vercel.app",  # Production domain
+        "http://localhost:5173",         # Local development
+        "http://localhost:3000",         # Alternative local development
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

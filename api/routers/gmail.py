@@ -20,7 +20,7 @@ router = APIRouter(prefix="/gmail", tags=["gmail"])
 # Environment variables
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:5173/api/auth/gmail/callback")
+REDIRECT_URI = os.getenv("REDIRECT_URI", "https://audiobrew.vercel.app/api/auth/gmail/callback")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
