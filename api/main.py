@@ -11,7 +11,7 @@ parent_directory = current_file.parent.parent
 sys.path.append(str(parent_directory))
 
 # Now import the routers
-from api.routers import gmail, podcast
+from api.routers import gmail, podcast, user
 
 app = FastAPI(title="AudioBrew API")
 
@@ -27,6 +27,7 @@ app.add_middleware(
 # Include the routers
 app.include_router(gmail.router, prefix="/api")
 app.include_router(podcast.router, prefix="/api")
+app.include_router(user.router, prefix="/api")
 
 # Add a special route to handle the auth/gmail/callback path
 @app.get("/api/auth/gmail/callback")

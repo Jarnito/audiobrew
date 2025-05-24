@@ -3,6 +3,8 @@
     import { sessionStore } from "$lib/stores/sessionStore";
     import { onMount, onDestroy } from "svelte";
     import { fade } from "svelte/transition";
+    import { downloadPodcast as downloadPodcastAction, sharePodcast as sharePodcastAction, deletePodcast as deletePodcastAction, type Podcast } from "../utils/podcastActions";
+    import { checkGmailConnection, checkAudioBrewLabel as checkAudioBrewLabelUtil } from "../../gmail/utils/gmailConnection";
     
     // Define types for Gmail emails
     interface GmailEmail {
@@ -11,17 +13,6 @@
         from: string;
         date: string;
         snippet: string;
-    }
-    
-    // Define types for podcasts
-    interface Podcast {
-        id: string;
-        title: string;
-        duration: number; // seconds
-        created_at: string;
-        audio_url: string;
-        source_emails: number;
-        script_markdown?: string; // Add script_markdown field
     }
     
     // State variables for podcast generation
@@ -38,6 +29,7 @@
     let currentlyPlaying: string | null = null;
     let audioElement: HTMLAudioElement;
     let showEmails = false; // Toggle state for showing/hiding emails
+    let isGmailConnected = false; // Track Gmail connection status
     
     // Variables for audio progress tracking
     let currentProgress = 0;
@@ -70,7 +62,7 @@
         });
     }
     
-    // Check if user has the AudioBrew label
+    // Check if user has Gmail connected and the AudioBrew label
     async function checkAudioBrewLabel() {
         if (!$sessionStore?.user) {
             error = 'You must be logged in to check Gmail labels';
@@ -81,16 +73,32 @@
             isCheckingLabels = true;
             error = '';
             
-            const response = await fetch(`/api/gmail/labels?user_id=${$sessionStore.user.id}`);
+            // First check if Gmail is connected
+            const connectionStatus = await checkGmailConnection($sessionStore.user.id);
+            isGmailConnected = connectionStatus.isConnected;
             
-            if (!response.ok) {
-                const data = await response.json();
-                error = data.detail || 'Failed to check Gmail labels';
+            if (!connectionStatus.isConnected) {
+                labelMessage = '📧 Connect your Gmail or Outlook account in the <a href="/dashboard/profile" class="text-black hover:text-blue-800 underline">Profile page</a> to start generating podcasts from your newsletters.';
+                hasAudioBrewLabel = false;
                 return;
             }
             
-            const data = await response.json();
-            hasAudioBrewLabel = data.has_audiobrew_label;
+            // If Gmail is connected, check for AudioBrew label
+            const labelStatus = await checkAudioBrewLabelUtil($sessionStore.user.id);
+            
+            if (labelStatus.error === 'gmail_not_connected') {
+                labelMessage = '📧 Connect your Gmail or Outlook account in the <a href="/dashboard/profile" class="text-black hover:text-blue-800 underline">Profile page</a> to start generating podcasts from your newsletters.';
+                hasAudioBrewLabel = false;
+                isGmailConnected = false;
+                return;
+            }
+            
+            if (labelStatus.error) {
+                error = labelStatus.error;
+                return;
+            }
+            
+            hasAudioBrewLabel = labelStatus.hasLabel;
             
             if (hasAudioBrewLabel) {
                 labelMessage = '💡 AudioBrew label found in your Gmail account.';
@@ -102,7 +110,7 @@
             
         } catch (err) {
             console.error('Error checking Gmail labels:', err);
-            error = 'Failed to check Gmail labels';
+            error = 'Failed to check Gmail connection and labels';
         } finally {
             isCheckingLabels = false;
         }
@@ -186,27 +194,18 @@
             return; // User canceled the deletion
         }
         
-        try {
-            const response = await fetch(`/api/podcast/${podcastId}?user_id=${$sessionStore.user.id}`, {
-                method: 'DELETE'
-            });
-            
-            if (!response.ok) {
-                const data = await response.json();
-                error = data.detail || 'Failed to delete podcast';
-                return;
-            }
-            
-            // Show success notification
-            showNotification('Podcast deleted successfully');
-            
-            // Refresh the podcast list
-            await fetchPodcasts();
-            
-        } catch (err) {
-            console.error('Error deleting podcast:', err);
-            error = 'Failed to delete podcast';
+        const errorMessage = await deletePodcastAction(podcastId, $sessionStore.user.id);
+        if (errorMessage) {
+            error = errorMessage;
+            setTimeout(() => error = '', 3000);
+            return;
         }
+        
+        // Show success notification
+        showNotification('Podcast deleted successfully');
+        
+        // Refresh the podcast list
+        await fetchPodcasts();
     }
     
     // Show notification
@@ -430,28 +429,6 @@
             });
     }
     
-    // Download podcast audio
-    function downloadPodcast(podcast: Podcast): void {
-        const audioUrl = getAudioUrl(podcast.audio_url);
-        
-        // Skip if it's a placeholder URL
-        if (audioUrl.includes('example.com')) {
-            error = 'Audio file is not available for download';
-            setTimeout(() => error = '', 3000);
-            return;
-        }
-        
-        // Create a temporary link element
-        const link = document.createElement('a');
-        link.href = audioUrl;
-        link.download = `${podcast.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp3`;
-        link.target = '_self'; // Ensure it doesn't open in a new tab
-        
-        // Append to the document, click it, and remove it
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
     
     // Toggle the popover menu
     function togglePodcastMenu(podcastId: string, event: MouseEvent) {
@@ -518,6 +495,24 @@
             audioElement.src = '';
         }
     });
+
+    // Handle download action
+    async function handleDownload(podcast: Podcast) {
+        const errorMessage = await downloadPodcastAction(podcast);
+        if (errorMessage) {
+            error = errorMessage;
+            setTimeout(() => error = '', 3000);
+        }
+    }
+    
+    // Handle share action
+    async function handleShare(podcast: Podcast) {
+        const errorMessage = await sharePodcastAction(podcast);
+        if (errorMessage) {
+            error = errorMessage;
+            setTimeout(() => error = '', 3000);
+        }
+    }
 </script>
 
 <div class="w-full max-w-2xl bg-white/15 backdrop-blur-5xl rounded-3xl shadow-md border border-gray-200 overflow-visible transition-all duration-300 mx-auto my-8" onclick={handleOutsideClick} onkeydown={handleKeyDown} role="presentation" tabindex="-1">
@@ -530,8 +525,8 @@
                 <h2 class="text-lg font-semibold mb-3">Generate</h2>
                 
                 {#if labelMessage}
-                    <div class="text-xs mb-4 p-2 rounded {hasAudioBrewLabel ? 'bg-green-50/80' : 'bg-yellow-50/80'}">
-                        {labelMessage}
+                    <div class="text-xs mb-4 p-2 rounded {isGmailConnected && hasAudioBrewLabel ? 'bg-green-50/80' : !isGmailConnected ? 'bg-blue-50/80' : 'bg-yellow-50/80'}">
+                        {@html labelMessage}
                     </div>
                 {/if}
                 
@@ -673,7 +668,7 @@
                                             class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
                                             role="menuitem"
                                             aria-label="Download"
-                                            onclick={() => downloadPodcast(podcast)}
+                                            onclick={() => handleDownload(podcast)}
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                                 <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -683,6 +678,7 @@
                                             class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
                                             role="menuitem"
                                             aria-label="Share"
+                                            onclick={() => handleShare(podcast)}
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                                 <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />

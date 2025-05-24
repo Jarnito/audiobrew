@@ -28,7 +28,11 @@
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: `${window.location.origin}/auth/callback`
+            redirectTo: `${window.location.origin}/auth/callback`,
+            queryParams: {
+              prompt: 'select_account',  // Force account selection for signup
+              access_type: 'offline'     // Ensure we get refresh tokens
+            }
           }
         });
         if (error) throw error;

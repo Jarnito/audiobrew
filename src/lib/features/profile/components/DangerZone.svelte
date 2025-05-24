@@ -2,6 +2,7 @@
     import { buttonVariants } from "$lib/components/ui/button";
     import { supabase } from "$lib/supabaseClient";
     import { goto } from "$app/navigation";
+    import { deleteAccount as deleteAccountAction } from "../utils/accountActions";
     
     export let userId: string;
     
@@ -16,13 +17,13 @@
             isDeleting = true;
             error = '';
             
-            // This is a placeholder for the actual account deletion logic
-            // In a real implementation, you would call a backend API endpoint
-            const { error: deleteError } = await supabase.functions.invoke('delete-account', {
-                body: { user_id: userId }
-            });
-            
-            if (deleteError) throw deleteError;
+            // Use the modular deleteAccount function
+            const errorMessage = await deleteAccountAction(userId);
+            if (errorMessage) {
+                error = errorMessage;
+                showConfirmation = false;
+                return;
+            }
             
             // Sign out and redirect to home page after successful deletion
             await supabase.auth.signOut();

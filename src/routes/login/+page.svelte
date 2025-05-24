@@ -14,6 +14,7 @@
           provider: 'google',
           options: {
             redirectTo: `${window.location.origin}/auth/callback`
+            // Note: No prompt parameter here allows instant login if user is already signed in
           }
         });
         if (error) throw error;
