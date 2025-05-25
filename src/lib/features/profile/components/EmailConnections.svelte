@@ -3,9 +3,11 @@
     import { onMount } from "svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { API_CONFIG } from '$lib/config';
 
-    export let userId: string;
-    
+    // Get user from page data
+    $: user = $page.data.user;
+
     // UI states for Gmail connection
     let isConnected = false;
     let userEmail = '';
@@ -57,46 +59,52 @@
 
     // Function to check if Gmail is connected
     async function checkConnectionStatus() {
+        if (!user?.id) return;
+
         try {
-            isLoading = true;
-            const response = await fetch(`/api/gmail/status?user_id=${userId}`);
+            const response = await fetch(API_CONFIG.url(`api/gmail/status?user_id=${user.id}`));
             
             if (response.ok) {
                 const data = await response.json();
                 isConnected = data.is_connected;
-                userEmail = data.email || "";
+                userEmail = data.email || '';
+                error = '';
             } else {
-                const errorText = await response.text();
-                console.error("Failed to check Gmail connection status:", response.status, errorText);
+                const errorData = await response.json().catch(() => ({ detail: 'Failed to check connection status' }));
+                error = `Failed to check Gmail connection status: ${errorData.detail}`;
+                console.error('Failed to check Gmail connection status:', response.status, errorData.detail);
             }
         } catch (err) {
-            console.error("Error checking Gmail connection:", err);
-            error = "Failed to check connection status";
-        } finally {
-            isLoading = false;
+            error = `Failed to check Gmail connection status: ${(err as Error)?.message}`;
+            console.error('Failed to check Gmail connection status:', err);
         }
     }
     
     // Function to start Gmail authentication
     async function connectGmail() {
+        if (!user?.id) return;
+
         try {
             isLoading = true;
-            error = "";
+            error = '';
             
-            const response = await fetch(`/api/gmail/auth?user_id=${userId}`);
+            const response = await fetch(API_CONFIG.url(`api/gmail/auth?user_id=${user.id}`));
             
             if (response.ok) {
                 const data = await response.json();
-                // Redirect to Google's authorization page
-                window.location.href = data.authorization_url;
+                if (data.auth_url) {
+                    window.location.href = data.auth_url;
+                } else {
+                    error = 'No authorization URL received';
+                }
             } else {
-                const errorText = await response.text();
-                console.error("Failed to start Gmail authentication:", response.status, errorText);
-                error = "Failed to start Gmail authentication";
+                const errorData = await response.json().catch(() => ({ detail: 'Failed to start authentication' }));
+                error = `Failed to start Gmail authentication: ${errorData.detail}`;
+                console.error('Failed to start Gmail authentication:', response.status, errorData.detail);
             }
         } catch (err) {
-            console.error("Error connecting to Gmail:", err);
-            error = "Failed to connect to Gmail";
+            error = `Failed to start Gmail authentication: ${(err as Error)?.message}`;
+            console.error('Failed to start Gmail authentication:', err);
         } finally {
             isLoading = false;
         }
@@ -104,11 +112,13 @@
     
     // Function to disconnect Gmail
     async function disconnectGmail() {
+        if (!user?.id) return;
+
         try {
             isLoading = true;
-            error = "";
+            error = '';
             
-            const response = await fetch(`/api/gmail/disconnect?user_id=${userId}`, {
+            const response = await fetch(API_CONFIG.url(`api/gmail/disconnect?user_id=${user.id}`), {
                 method: "DELETE"
             });
             

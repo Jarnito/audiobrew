@@ -1,46 +1,32 @@
 import { supabase } from "$lib/supabaseClient";
-import { sessionStore } from "$lib/stores/sessionStore";
-import { get } from 'svelte/store';
 
 // Default placeholder
 export const placeholderImage = "/nopicture_placeholder.png";
 
-// Get the profile image src with fallback
-export function getProfileImageSrc(imagePreview: string | null = null) {
-    const sessionValue = get(sessionStore);
-    
-    // Priority 0: First check if there's a preview from a newly selected image
-    // This is important for immediate feedback during upload
+// Simple function to get profile image source with fallback
+export function getProfileImageSrc(user: any | null, imagePreview: string | null = null): string {
+    // Priority 0: Preview from newly selected image
     if (imagePreview) {
         return imagePreview;
     }
     
-    if (!sessionValue?.user) {
+    if (!user) {
         return placeholderImage;
     }
     
-    // Get avatar URL from user metadata
-    const metadata = sessionValue.user.user_metadata;
+    const metadata = user.user_metadata;
     
-    // Priority 1: Check for our custom avatar URL field that persists across OAuth refreshes
+    // Priority 1: Custom avatar URL 
     if (metadata?.custom_avatar_url && metadata.custom_avatar_url.trim() !== '') {
         return metadata.custom_avatar_url;
     }
     
-    // Priority 2: Check regular avatar_url
-    const avatarUrl = metadata?.avatar_url;
-    
-    if (avatarUrl && avatarUrl.trim() !== '') {
-        // Check if this URL is from our Supabase bucket (user uploaded)
-        if (avatarUrl.includes('profilepic')) {
-            return avatarUrl;
-        }
-        
-        // Priority 3: OAuth provider avatar URL (Google, etc.)
-        return avatarUrl;
+    // Priority 2: Regular avatar URL (from OAuth)
+    if (metadata?.avatar_url && metadata.avatar_url.trim() !== '') {
+        return metadata.avatar_url;
     }
     
-    // Priority 4: Default placeholder if no avatar is available
+    // Priority 3: Default placeholder
     return placeholderImage;
 }
 
@@ -53,7 +39,6 @@ export function createImagePreview(file: File): Promise<string> {
             img.onload = () => {
                 // Create a canvas to resize the image preview
                 const canvas = document.createElement('canvas');
-                // Limit preview size to 150x150 pixels
                 const MAX_SIZE = 150;
                 let width = img.width;
                 let height = img.height;
@@ -82,7 +67,7 @@ export function createImagePreview(file: File): Promise<string> {
                 }
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // Get a compressed data URL for preview only
+                // Get a compressed data URL for preview
                 resolve(canvas.toDataURL('image/jpeg', 0.7));
             };
             img.onerror = () => reject(new Error('Failed to load image'));
@@ -94,13 +79,12 @@ export function createImagePreview(file: File): Promise<string> {
 }
 
 // Upload profile image to Supabase
-export async function uploadProfileImage(profileImage: File | null) {
+export async function uploadProfileImage(profileImage: File, userId: string): Promise<string> {
     if (!profileImage) {
         throw new Error('No profile image provided');
     }
     
-    const sessionValue = get(sessionStore);
-    if (!sessionValue?.user) {
+    if (!userId) {
         throw new Error('User not authenticated');
     }
     
@@ -116,42 +100,14 @@ export async function uploadProfileImage(profileImage: File | null) {
         throw new Error('Image size must be less than 5MB');
     }
     
-    // Check if user already has a custom avatar and delete it first
-    const metadata = sessionValue.user.user_metadata;
-    if (metadata?.custom_avatar_url && metadata.custom_avatar_url.includes('profilepic')) {
-        try {
-            // Extract the filename from the URL
-            const oldFileUrl = metadata.custom_avatar_url;
-            const oldFileName = oldFileUrl.split('/').pop();
-            
-            if (oldFileName) {
-                console.log('Deleting old profile image:', oldFileName);
-                // Delete the file from storage
-                const { error: deleteError } = await supabase.storage
-                    .from('profilepic')
-                    .remove([oldFileName]);
-                    
-                if (deleteError) {
-                    console.warn('Failed to delete old profile image:', deleteError);
-                    // Continue with upload even if delete fails
-                } else {
-                    console.log('Successfully deleted old profile image');
-                }
-            }
-        } catch (e) {
-            console.warn('Error while trying to delete old profile image:', e);
-            // Continue with upload even if delete fails
-        }
-    }
-    
     // Create a unique file path
     const fileExt = profileImage.name.split('.').pop();
-    const fileName = `${sessionValue.user.id}-${Date.now()}.${fileExt}`;
+    const fileName = `${userId}-${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
     
     // Upload to storage
     const { error: uploadError } = await supabase.storage
-        .from('profilepic')  // Use 'profilepic' bucket 
+        .from('profilepic')
         .upload(filePath, profileImage);
         
     if (uploadError) {
@@ -161,23 +117,17 @@ export async function uploadProfileImage(profileImage: File | null) {
     
     // Get the public URL
     const { data: publicUrlData } = supabase.storage
-        .from('profilepic')  // Use 'profilepic' bucket
+        .from('profilepic')
         .getPublicUrl(filePath);
         
-    // Update user metadata with ONLY the custom avatar URL field that won't be overwritten by OAuth
+    // Update user metadata
     const { error: updateError } = await supabase.auth.updateUser({
         data: { 
-            custom_avatar_url: publicUrlData.publicUrl  // Only set the custom field
+            custom_avatar_url: publicUrlData.publicUrl
         }
     });
     
     if (updateError) throw updateError;
-    
-    // Update session store
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-        sessionStore.set({...sessionValue, user: data.user});
-    }
     
     return publicUrlData.publicUrl;
 } 

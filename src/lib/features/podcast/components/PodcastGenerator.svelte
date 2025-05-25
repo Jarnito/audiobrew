@@ -1,10 +1,14 @@
 <script lang="ts">
     import { buttonVariants } from "$lib/components/ui/button";
-    import { sessionStore } from "$lib/stores/sessionStore";
+    import { page } from "$app/stores";
     import { onMount, onDestroy } from "svelte";
     import { fade } from "svelte/transition";
     import { downloadPodcast as downloadPodcastAction, sharePodcast as sharePodcastAction, deletePodcast as deletePodcastAction, type Podcast } from "../utils/podcastActions";
     import { checkGmailConnection, checkAudioBrewLabel as checkAudioBrewLabelUtil } from "../../gmail/utils/gmailConnection";
+    import { API_CONFIG } from '$lib/config';
+    
+    // Get user from page data
+    $: user = $page.data.user;
     
     // Define types for Gmail emails
     interface GmailEmail {
@@ -64,7 +68,7 @@
     
     // Check if user has Gmail connected and the AudioBrew label
     async function checkAudioBrewLabel() {
-        if (!$sessionStore?.user) {
+        if (!user) {
             error = 'You must be logged in to check Gmail labels';
             return;
         }
@@ -74,7 +78,7 @@
             error = '';
             
             // First check if Gmail is connected
-            const connectionStatus = await checkGmailConnection($sessionStore.user.id);
+            const connectionStatus = await checkGmailConnection(user.id);
             isGmailConnected = connectionStatus.isConnected;
             
             if (!connectionStatus.isConnected) {
@@ -84,7 +88,7 @@
             }
             
             // If Gmail is connected, check for AudioBrew label
-            const labelStatus = await checkAudioBrewLabelUtil($sessionStore.user.id);
+            const labelStatus = await checkAudioBrewLabelUtil(user.id);
             
             if (labelStatus.error === 'gmail_not_connected') {
                 labelMessage = '📧 Connect your Gmail or Outlook account in the <a href="/dashboard/profile" class="text-black hover:text-blue-800 underline">Profile page</a> to start generating podcasts from your newsletters.';
@@ -118,7 +122,7 @@
     
     // Fetch emails from the AudioBrew label
     async function fetchEmailsFromAudioBrewLabel() {
-        if (!$sessionStore?.user) {
+        if (!user) {
             error = 'You must be logged in to fetch emails';
             return;
         }
@@ -127,7 +131,7 @@
             isLoadingEmails = true;
             error = '';
             
-            const response = await fetch(`/api/gmail/emails?user_id=${$sessionStore.user.id}`);
+            const response = await fetch(API_CONFIG.url(`api/gmail/emails?user_id=${user.id}`));
             
             if (!response.ok) {
                 const data = await response.json();
@@ -154,7 +158,7 @@
     
     // Fetch user's podcasts
     async function fetchPodcasts() {
-        if (!$sessionStore?.user) {
+        if (!user) {
             error = 'You must be logged in to fetch podcasts';
             return;
         }
@@ -163,7 +167,7 @@
             isLoadingPodcasts = true;
             error = '';
             
-            const response = await fetch(`/api/podcast/list?user_id=${$sessionStore.user.id}`);
+            const response = await fetch(API_CONFIG.url(`api/podcast/list?user_id=${user.id}`));
             
             if (!response.ok) {
                 const data = await response.json();
@@ -184,7 +188,7 @@
     
     // Delete a podcast
     async function deletePodcast(podcastId: string) {
-        if (!$sessionStore?.user) {
+        if (!user) {
             error = 'You must be logged in to delete a podcast';
             return;
         }
@@ -194,7 +198,7 @@
             return; // User canceled the deletion
         }
         
-        const errorMessage = await deletePodcastAction(podcastId, $sessionStore.user.id);
+        const errorMessage = await deletePodcastAction(podcastId, user.id);
         if (errorMessage) {
             error = errorMessage;
             setTimeout(() => error = '', 3000);
@@ -223,7 +227,7 @@
     
     // Handle podcast generation
     async function generatePodcast() {
-        if (!$sessionStore?.user) {
+        if (!user) {
             error = 'You must be logged in to generate a podcast';
             return;
         }
@@ -254,13 +258,13 @@
             const title = `☕ Brew - ${formattedDate}`;
             
             // Call the API to generate the podcast
-            const response = await fetch('/api/podcast/generate', {
+            const response = await fetch(API_CONFIG.url('api/podcast/generate'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    user_id: $sessionStore.user.id,
+                    user_id: user.id,
                     email_ids: emailIds,
                     title: title
                 })
@@ -288,7 +292,7 @@
             refreshInterval = setInterval(async () => {
                 // Fetch podcasts without setting loading state
                 try {
-                    const response = await fetch(`/api/podcast/list?user_id=${$sessionStore.user.id}`);
+                    const response = await fetch(API_CONFIG.url(`api/podcast/list?user_id=${user.id}`));
                     
                     if (response.ok) {
                         const data = await response.json();
@@ -469,7 +473,7 @@
 
     onMount(async () => {
         // Check if user is logged in
-        if ($sessionStore?.user) {
+        if (user) {
             // Set loading state for podcasts immediately
             isLoadingPodcasts = true;
             

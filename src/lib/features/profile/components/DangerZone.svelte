@@ -1,29 +1,26 @@
 <script lang="ts">
     import { buttonVariants } from "$lib/components/ui/button";
     import { supabase } from "$lib/supabaseClient";
+    import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { deleteAccount as deleteAccountAction } from "../utils/accountActions";
     
-    export let userId: string;
+    // Get user from page data
+    $: user = $page.data.user;
     
     let isDeleting = false;
     let showConfirmation = false;
     let error = '';
     
     async function deleteAccount() {
-        if (!userId) return;
+        if (!user?.id) return;
         
         try {
             isDeleting = true;
             error = '';
             
             // Use the modular deleteAccount function
-            const errorMessage = await deleteAccountAction(userId);
-            if (errorMessage) {
-                error = errorMessage;
-                showConfirmation = false;
-                return;
-            }
+            await deleteAccountAction(user.id);
             
             // Sign out and redirect to home page after successful deletion
             await supabase.auth.signOut();

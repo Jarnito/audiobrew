@@ -15,10 +15,15 @@ from api.routers import gmail, podcast, user
 
 app = FastAPI(title="AudioBrew API")
 
-# Add CORS middleware to allow frontend to call the API - updated config
+# Add CORS middleware - Updated for Render production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "https://audiobrew.vercel.app",  # Your frontend on Vercel
+        "http://localhost:5173",         # Local development
+        "http://localhost:3000",         # Alternative local development
+        "https://*.onrender.com",        # Allow any Render subdomain (for testing)
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -42,3 +47,12 @@ async def auth_gmail_callback(code: str = None, state: str = None):
 @app.get("/")
 async def root():
     return {"message": "AudioBrew API is running"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "audiobrew-api"}
+
+# For local development and testing
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,116 +1,103 @@
 <script lang="ts">
-    import { sessionStore } from "$lib/stores/sessionStore";
-    import { onMount } from "svelte";
+    import { page } from "$app/stores";
+    import { invalidate } from "$app/navigation";
     import { supabase } from "$lib/supabaseClient";
     import { buttonVariants } from "$lib/components/ui/button";
-    import { MAX_NAME_LENGTH, validateDisplayName, createMessageClearer } from "../utils/validation";
-    
-    export let error = '';
-    export let success = false;
-    
+
+    // Get user from page data
+    $: user = $page.data.user;
+
     let displayName = '';
-    let loading = false;
-    let displayNameError = '';
-    
-    // Set up message clearer
-    const clearMessages = createMessageClearer();
-    
-    onMount(async () => {
-        if ($sessionStore?.user) {
-            displayName = $sessionStore.user.user_metadata.display_name || '';
-        }
-    });
-    
+    let isLoading = false;
+    let error = '';
+    let success = '';
+
+    // Initialize form when user data is available
+    $: if (user) {
+        displayName = user.user_metadata.display_name || '';
+    }
+
     async function updateProfile() {
-        if (!$sessionStore) return;
-        
-        loading = true;
-        error = '';
-        displayNameError = '';
-        success = false;
-        
-        // Validate display name
-        const validation = validateDisplayName(displayName);
-        if (!validation.isValid) {
-            displayNameError = validation.error;
-            loading = false;
-            clearMessages(() => {
-                displayNameError = '';
-            });
-            return;
-        }
-        
+        if (!user) return;
+
         try {
-            // Update user metadata
-            const { error: updateError } = await supabase.auth.updateUser({
-                data: { display_name: displayName }
-            });
-            
-            if (updateError) throw updateError;
-            
-            success = true;
-            clearMessages(() => {
-                error = '';
-                displayNameError = '';
-                success = false;
-            });
-            
-            // Update the session store to reflect changes
-            const { data } = await supabase.auth.getUser();
-            if (data.user && $sessionStore) {
-                sessionStore.set({...$sessionStore, user: data.user});
+            isLoading = true;
+            error = '';
+            success = '';
+
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (!currentUser) {
+                error = 'User not authenticated';
+                return;
             }
-        } catch (e: any) {
-            error = e.message || 'Failed to update profile';
-            console.error('Error updating profile:', e);
-            clearMessages(() => {
-                error = '';
-                displayNameError = '';
-                success = false;
+
+            const { data, error: updateError } = await supabase.auth.updateUser({
+                data: {
+                    display_name: displayName,
+                }
             });
+
+            if (updateError) {
+                error = updateError.message;
+                return;
+            }
+
+            if (data.user) {
+                success = 'Profile updated successfully!';
+                // Force a refresh of the user data
+                await invalidate('supabase:auth');
+                
+                // Clear success message after 3 seconds
+                setTimeout(() => {
+                    success = '';
+                }, 3000);
+            }
+
+        } catch (err) {
+            error = 'Failed to update profile';
+            console.error('Error updating profile:', err);
         } finally {
-            loading = false;
+            isLoading = false;
         }
     }
 
-    // Handle form submission
     function handleSubmit(event: Event) {
         event.preventDefault();
         updateProfile();
     }
 </script>
 
-<form onsubmit={handleSubmit} class="space-y-3">
-    <!-- Display Name -->
+<form on:submit={handleSubmit} class="space-y-4">
     <div>
         <label for="displayName" class="block text-sm font-medium text-gray-700 mb-1">
-            Username
+            Display Name
         </label>
-        <input 
-            type="text" 
-            id="displayName" 
-            bind:value={displayName} 
-            maxlength={MAX_NAME_LENGTH}
-            required
-            class="bg-white/40 backdrop-blur-sm block w-full p-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" 
+        <input
+            id="displayName"
+            type="text"
+            bind:value={displayName}
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter your display name"
+            maxlength="50"
         />
-        <div class="flex justify-between items-center mt-1">
-            <span class="text-sm text-gray-500">Change your name</span>
-            <span class="text-xs text-gray-400">{displayName.length}/{MAX_NAME_LENGTH}</span>
-        </div>
-        {#if displayNameError}
-            <p class="text-red-600 text-xs mt-1">{displayNameError}</p>
+        {#if error}
+            <p class="text-red-600 text-xs mt-1">{error}</p>
         {/if}
     </div>
-    
-    <!-- Save Changes Button -->
-    <div class="py-2 pb-5">
-        <button 
+
+    <div>
+        <button
             type="submit" 
             class={buttonVariants({ variant: "default" })}
-            disabled={loading}
+            disabled={isLoading || !displayName.trim()}
         >
-            {loading ? 'Saving...' : 'Save Changes'}
+            {isLoading ? 'Updating...' : 'Update Profile'}
         </button>
     </div>
+
+    {#if success}
+        <div class="text-green-600 text-sm">
+            {success}
+        </div>
+    {/if}
 </form> 

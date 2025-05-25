@@ -1,9 +1,5 @@
 <script lang="ts">
     import DangerZone from "$lib/features/profile/components/DangerZone.svelte";
-    import { page } from "$app/stores";
-    
-    // Get the current user from the page store
-    const user = $page.data.user;
 </script>
 
 <div class="flex justify-center items-center min-h-[calc(100vh-4rem)]">
@@ -23,9 +19,7 @@
                         <p class="text-gray-500 text-sm">Notification settings options will appear here.</p>
                     </div>
                     
-                    {#if user}
-                        <DangerZone userId={user.id} />
-                    {/if}
+                    <DangerZone />
                 </div>
             </div>
         </div>

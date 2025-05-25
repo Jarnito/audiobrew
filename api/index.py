@@ -9,11 +9,11 @@ from .routers import gmail, podcast, user
 
 app = FastAPI(title="AudioBrew API")
 
-# Add CORS middleware to allow frontend to call the API
+# Add CORS middleware - Updated for Railway production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://audiobrew.vercel.app",  # Production domain
+        "https://audiobrew.vercel.app",  # Production frontend
         "http://localhost:5173",         # Local development
         "http://localhost:3000",         # Alternative local development
     ],
@@ -38,9 +38,12 @@ async def auth_gmail_callback(code: str = None, state: str = None):
     return RedirectResponse(url=f"/api/gmail/callback?code={code}&state={state}")
 
 @app.get("/")
-@app.get("/api")
 async def root():
     return {"message": "AudioBrew API is running"}
 
-# Create the handler for Vercel
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "audiobrew-api"}
+
+# Create the handler for Vercel (keep for compatibility)
 handler = Mangum(app, lifespan="off") 

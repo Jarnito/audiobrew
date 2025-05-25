@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { buttonVariants } from "$lib/components/ui/button";
-	import { sessionStore } from "$lib/stores/sessionStore";
+	import { page } from "$app/stores";
 	import { goto, invalidate } from "$app/navigation";
 	import { supabase } from "$lib/supabaseClient";
+
+    // Get user from page data
+    $: user = $page.data.user;
+    $: session = $page.data.session;
 
     async function signOut() {
 		const { error } = await supabase.auth.signOut();
@@ -27,10 +31,10 @@
 
 	<!-- Right: Signup button -->
 
-    {#if $sessionStore}
+    {#if session}
         <div class="flex items-center gap-3">
             <span class="font-medium text-gray-700">
-                {$sessionStore?.user?.user_metadata?.display_name ?? 'User'}
+                {user?.user_metadata?.display_name ?? 'User'}
             </span>
             <button
                 onclick={signOut}

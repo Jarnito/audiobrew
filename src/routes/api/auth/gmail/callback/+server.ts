@@ -1,12 +1,13 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
+import { API_CONFIG } from '$lib/config';
 
 /**
  * This route handles the callback from Google's OAuth server.
- * It proxies the OAuth code to our FastAPI backend which exchanges it for tokens
+ * It proxies the OAuth code to our FastAPI backend on Render which exchanges it for tokens
  * and stores the credentials in Supabase.
  */
-export const GET = async ({ url, fetch }: RequestEvent) => {
+export const GET = async ({ url }: RequestEvent) => {
   // Extract the code and state (user_id) from the URL
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
@@ -17,8 +18,8 @@ export const GET = async ({ url, fetch }: RequestEvent) => {
   }
 
   try {
-    // Forward the code and state to our FastAPI backend
-    const response = await fetch(`/api/auth/gmail/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
+    // Forward the code and state to our FastAPI backend on Render
+    const response = await fetch(API_CONFIG.url(`api/gmail/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`));
     
     if (!response.ok) {
       const errorText = await response.text();
