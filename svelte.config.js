@@ -11,7 +11,7 @@ const config = {
 		// Use Vercel adapter for deployment
 		adapter: adapter({
 			// Optional: configure the adapter
-			runtime: 'nodejs18.x'
+			runtime: 'nodejs20.x'
 		})
 	}
 };
