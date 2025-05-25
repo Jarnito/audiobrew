@@ -1,12 +1,12 @@
 <script lang="ts">
     import { buttonVariants } from "$lib/components/ui/button";
     import { onMount } from "svelte";
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { API_CONFIG } from '$lib/config';
 
     // Get user from page data
-    $: user = $page.data.user;
+    $: user = page.data.user;
 
     // UI states for Gmail connection
     let isConnected = false;
@@ -25,9 +25,9 @@
      // Check if there are URL query parameters related to Gmail connection
     onMount(async () => {
         // Handle URL parameters if coming back from OAuth flow
-        const gmailConnected = $page.url.searchParams.get("gmail_connected");
-        const gmailError = $page.url.searchParams.get("gmail_error");
-        const email = $page.url.searchParams.get("email");
+        const gmailConnected = page.url.searchParams.get("gmail_connected");
+        const gmailError = page.url.searchParams.get("gmail_error");
+        const email = page.url.searchParams.get("email");
         
         // Clear URL parameters if present
         if (gmailConnected || gmailError || email) {

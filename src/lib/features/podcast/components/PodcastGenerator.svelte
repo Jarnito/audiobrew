@@ -1,6 +1,6 @@
 <script lang="ts">
     import { buttonVariants } from "$lib/components/ui/button";
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
     import { onMount, onDestroy } from "svelte";
     import { fade } from "svelte/transition";
     import { downloadPodcast as downloadPodcastAction, sharePodcast as sharePodcastAction, deletePodcast as deletePodcastAction, type Podcast } from "../utils/podcastActions";
@@ -8,7 +8,7 @@
     import { API_CONFIG } from '$lib/config';
     
     // Get user from page data
-    $: user = $page.data.user;
+    $: user = page.data.user;
     
     // Define types for Gmail emails
     interface GmailEmail {

@@ -1,12 +1,12 @@
 <script lang="ts">
     import { buttonVariants } from "$lib/components/ui/button";
     import { supabase } from "$lib/supabaseClient";
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { deleteAccount as deleteAccountAction } from "../utils/accountActions";
     
     // Get user from page data
-    $: user = $page.data.user;
+    $: user = page.data.user;
     
     let isDeleting = false;
     let showConfirmation = false;
