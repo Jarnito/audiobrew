@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Input, Button, Label } from "$lib/index";
-    import { page } from '$app/stores';
+    import { page } from '$app/state';
     import { supabase } from '$lib/supabaseClient'; 
 
   
@@ -63,8 +63,8 @@
         </div>
       </div>
       <Button type="submit" class="w-full h-9 mt-6" variant="default">Log in</Button>
-      {#if $page.form?.error}
-        <p class="text-red-500 text-sm mt-2 text-center">{$page.form.error}</p>
+      {#if page.form?.error}
+        <p class="text-red-500 text-sm mt-2 text-center">{page.form.error}</p>
       {/if}
     </form>
 

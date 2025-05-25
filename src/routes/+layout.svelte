@@ -3,7 +3,7 @@
 	import Navbar from '$lib/components/Navbar.svelte';
 	import { invalidate } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	let { data, children } = $props();
 	let { session, supabase } = data;
 
@@ -17,7 +17,7 @@
 	});
 </script>
 
-{#if !$page.url.pathname.startsWith('/dashboard')}
+{#if !page.url.pathname.startsWith('/dashboard')}
 	<Navbar />
 {/if}
 

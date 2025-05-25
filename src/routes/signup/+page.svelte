@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Input, Button, Label } from "$lib/index";
-    import { page } from '$app/stores';
+    import { page } from '$app/state';
     import { supabase } from '$lib/supabaseClient';
   
     let name = '';
@@ -43,7 +43,7 @@
     }
 </script>
 
-{#if $page.form?.success}
+{#if page.form?.success}
 <div class="max-w-xl mx-auto p-7 bg-white rounded-2xl shadow-lg flex flex-col items-center h-full">
   <div class="bg-green-50 border border-green-200 text-green-600 px-4 py-3 my-6 rounded-md">
     <p class="text-sm font-medium">Check your email</p>
