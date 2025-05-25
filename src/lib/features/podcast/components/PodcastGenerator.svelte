@@ -6,6 +6,7 @@
     import { downloadPodcast as downloadPodcastAction, sharePodcast as sharePodcastAction, deletePodcast as deletePodcastAction, type Podcast } from "../utils/podcastActions";
     import { checkGmailConnection, checkAudioBrewLabel as checkAudioBrewLabelUtil } from "../../gmail/utils/gmailConnection";
     import { API_CONFIG } from '$lib/config';
+    import { podcastGenerationStore, podcastGeneration } from '$lib/stores/podcastGenerationStore';
     
     // Get user from page data
     $: user = page.data.user;
@@ -19,8 +20,8 @@
         snippet: string;
     }
     
-    // State variables for podcast generation
-    let isGenerating = false;
+    // State variables for podcast generation - now using global store
+    $: isGenerating = $podcastGenerationStore.isGenerating;
     let error = '';
     let isCheckingLabels = false;
     let hasAudioBrewLabel = false;
@@ -241,7 +242,8 @@
         }
         
         try {
-            isGenerating = true;
+            // Start generation using global store
+            podcastGeneration.start(podcasts.length);
             error = '';
             
             // Get email IDs
@@ -273,6 +275,7 @@
             if (!response.ok) {
                 const data = await response.json();
                 error = data.detail || 'Failed to start podcast generation';
+                podcastGeneration.stop(); // Stop generation on error
                 return;
             }
             
@@ -287,7 +290,7 @@
                 clearInterval(refreshInterval);
             }
             
-            let initialPodcastCount = podcasts.length;
+            const initialPodcastCount = $podcastGenerationStore.initialPodcastCount;
             
             refreshInterval = setInterval(async () => {
                 // Fetch podcasts without setting loading state
@@ -304,9 +307,9 @@
                             clearInterval(refreshInterval);
                             refreshInterval = undefined;
                             
-                            // Show notification
+                            // Show notification and stop generation
                             showNotification('🎉 Your podcast has been generated successfully!', 5000);
-                            isGenerating = false;
+                            podcastGeneration.stop();
                         }
                     }
                 } catch (err) {
@@ -317,9 +320,7 @@
         } catch (err) {
             console.error('Error generating podcast:', err);
             error = 'Failed to generate podcast. Please try again later.';
-        } finally {
-            // Note: we don't set isGenerating to false here because we want to keep showing the loading state
-            // until the podcast is actually generated or an error occurs
+            podcastGeneration.stop(); // Stop generation on error
         }
     }
     
@@ -482,6 +483,38 @@
             
             // Fetch podcasts
             await fetchPodcasts();
+            
+            // If generation was already in progress, resume monitoring
+            if ($podcastGenerationStore.isGenerating) {
+                labelMessage = '🎧 Podcast generation in progress...';
+                
+                // Resume the refresh interval to check for completion
+                const initialPodcastCount = $podcastGenerationStore.initialPodcastCount;
+                
+                refreshInterval = setInterval(async () => {
+                    try {
+                        const response = await fetch(API_CONFIG.url(`api/podcast/list?user_id=${user.id}`));
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            podcasts = data || [];
+                            
+                            // Check if we have a new podcast
+                            if (podcasts.length > initialPodcastCount) {
+                                // Stop the interval once we have a new podcast
+                                clearInterval(refreshInterval);
+                                refreshInterval = undefined;
+                                
+                                // Show notification and stop generation
+                                showNotification('🎉 Your podcast has been generated successfully!', 5000);
+                                podcastGeneration.stop();
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error checking for new podcasts:', err);
+                    }
+                }, 5000);
+            }
         }
     });
 
@@ -519,192 +552,186 @@
     }
 </script>
 
-<div class="w-full max-w-2xl bg-white/15 backdrop-blur-5xl rounded-3xl shadow-md border border-gray-200 overflow-visible transition-all duration-300 mx-auto my-8" onclick={handleOutsideClick} onkeydown={handleKeyDown} role="presentation" tabindex="-1">
-    <div class="p-10 flex flex-col">
-        <h1 class="text-3xl font-bold mb-10 text-center">Dashboard</h1>
-        
-        <div class="flex flex-col max-h-[calc(100vh-12rem)] overflow-y-auto pr-6 -mr-6 pb-4">
-            <!-- Generate Section -->
-            <div class="w-[350px] mx-auto">
-                <h2 class="text-lg font-semibold mb-3">Generate</h2>
-                
-                {#if labelMessage}
-                    <div class="text-xs mb-4 p-2 rounded {isGmailConnected && hasAudioBrewLabel ? 'bg-green-50/80' : !isGmailConnected ? 'bg-blue-50/80' : 'bg-yellow-50/80'}">
-                        {@html labelMessage}
-                    </div>
-                {/if}
-                
-                {#if emails.length > 0}
-                    <div class="mb-4">
-                        <button 
-                            class="flex items-center justify-between w-full text-xs font-medium text-gray-700 bg-gray-50/80 hover:bg-gray-100/80 py-2 px-3 rounded border border-gray-100 transition-colors"
-                            onclick={() => showEmails = !showEmails}
-                            aria-expanded={showEmails}
-                            aria-label="Toggle email list"
-                        >
-                            <span>Available emails ({emails.length})</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transform transition-transform {showEmails ? 'rotate-180' : ''}" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                        
-                        {#if showEmails}
-                            <div class="mt-2" transition:fade={{ duration: 150 }}>
-                                <ul class="list-disc pl-5 space-y-1 max-h-32 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50/80 text-xs">
-                                    {#each emails as email}
-                                        <li class="truncate">{email.subject} <span class="text-gray-500">from {email.from.split('<')[0]}</span></li>
-                                    {/each}
-                                </ul>
-                            </div>
-                        {/if}
-                    </div>
-                {/if}
-                
-                <div class="mb-2">
-                    <button 
-                        onclick={generatePodcast}
-                        disabled={isGenerating || isCheckingLabels || isLoadingEmails}
-                        class={buttonVariants({ variant: "default" }) + 
-                            ((isGenerating || isCheckingLabels || isLoadingEmails) ? " opacity-70 cursor-not-allowed" : "") + 
-                            " w-full"}
-                        aria-label={isGenerating ? "Audio is brewing" : isCheckingLabels ? "Checking labels" : isLoadingEmails ? "Loading emails" : "Generate podcast"}
-                    >
-                        {#if isGenerating}
-                            <span class="inline-block mr-2">☕</span>
-                            Audio is brewing{ellipsis}
-                        {:else if isCheckingLabels}
-                            Checking...
-                        {:else if isLoadingEmails}
-                            Loading...
-                        {:else}
-                            Generate 🎙️
-                        {/if}
-                    </button>
-                    
-                    {#if errorMessage}
-                        <p class="text-red-500 text-xs mt-2">{errorMessage}</p>
-                    {/if}
+<!-- Generate Section -->
+<div class="w-full max-w-[350px] mx-auto">
+    <h1 class="text-3xl font-bold mb-10 text-center">Dashboard</h1>
+    
+    <h2 class="text-lg font-semibold mb-3">Generate</h2>
+    
+    {#if labelMessage}
+        <div class="text-xs mb-4 p-2 rounded {isGmailConnected && hasAudioBrewLabel ? 'bg-green-50/80' : !isGmailConnected ? 'bg-blue-50/80' : 'bg-yellow-50/80'}">
+            {@html labelMessage}
+        </div>
+    {/if}
+    
+    {#if emails.length > 0}
+        <div class="mb-4">
+            <button 
+                class="flex items-center justify-between w-full text-xs font-medium text-gray-700 bg-gray-50/80 hover:bg-gray-100/80 py-2 px-3 rounded border border-gray-100 transition-colors"
+                onclick={() => showEmails = !showEmails}
+                aria-expanded={showEmails}
+                aria-label="Toggle email list"
+            >
+                <span>Available emails ({emails.length})</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transform transition-transform {showEmails ? 'rotate-180' : ''}" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            
+            {#if showEmails}
+                <div class="mt-2" transition:fade={{ duration: 150 }}>
+                    <ul class="list-disc pl-5 space-y-1 max-h-32 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50/80 text-xs">
+                        {#each emails as email}
+                            <li class="truncate">{email.subject} <span class="text-gray-500">from {email.from.split('<')[0]}</span></li>
+                        {/each}
+                    </ul>
                 </div>
-            </div>
+            {/if}
+        </div>
+    {/if}
+    
+    <div class="mb-2">
+        <button 
+            onclick={generatePodcast}
+            disabled={isGenerating || isCheckingLabels || isLoadingEmails}
+            class={buttonVariants({ variant: "default" }) + 
+                ((isGenerating || isCheckingLabels || isLoadingEmails) ? " opacity-70 cursor-not-allowed" : "") + 
+                " w-full"}
+            aria-label={isGenerating ? "Audio is brewing" : isCheckingLabels ? "Checking labels" : isLoadingEmails ? "Loading emails" : "Generate podcast"}
+        >
+            {#if isGenerating}
+                <span class="inline-block mr-2">☕</span>
+                Audio is brewing{ellipsis}
+            {:else if isCheckingLabels}
+                Checking...
+            {:else if isLoadingEmails}
+                Loading...
+            {:else}
+                Generate 🎙️
+            {/if}
+        </button>
+        
+        {#if errorMessage}
+            <p class="text-red-500 text-xs mt-2">{errorMessage}</p>
+        {/if}
+    </div>
 
-            <!-- Your Podcasts Section -->
-            <div class="mt-6 pt-5 border-t w-[350px] mx-auto overflow-visible">
-                <h2 class="text-lg font-semibold mb-3">Your Podcasts</h2>
-                
-                {#if isLoadingPodcasts}
-                    <div class="text-center py-4 text-gray-500">
-                        Loading podcasts...
-                    </div>
-                {:else if podcasts.length === 0}
-                    <div class="text-center py-4 text-gray-500">
-                        <p>No podcasts created so far...</p>
-                        <p class="mt-3">Click the "Generate" button to create your first podcast.</p>
-                    </div>
-                {:else}
-                    <div class="space-y-3 overflow-visible">
-                        {#each podcasts as podcast}
-                            <div class="border border-gray-200/50 rounded-xl p-3 bg-gradient-to-br from-purple-100/90 to-pink-100/90 backdrop-blur-sm relative shadow-md">
-                                <!-- Three dots menu button at top right -->
-                                <div class="absolute top-3 right-3">
-                                    <button 
-                                        class="text-gray-700 hover:text-gray-900 transition-colors duration-200"
-                                        aria-label="Show podcast options"
-                                        onclick={(e) => togglePodcastMenu(podcast.id, e)}
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                                        </svg>
-                                    </button>
+    <!-- Your Podcasts Section -->
+    <div class="mt-6 pt-5 border-t overflow-visible" onclick={handleOutsideClick} onkeydown={handleKeyDown} role="presentation" tabindex="-1">
+        <h2 class="text-lg font-semibold mb-3">Your Podcasts</h2>
+        
+        {#if isLoadingPodcasts}
+            <div class="text-center py-4 text-gray-500">
+                Loading podcasts...
+            </div>
+        {:else if podcasts.length === 0}
+            <div class="text-center py-4 text-gray-500">
+                <p>No podcasts created so far...</p>
+                <p class="mt-3">Click the "Generate" button to create your first podcast.</p>
+            </div>
+        {:else}
+            <div class="space-y-3 overflow-visible">
+                {#each podcasts as podcast}
+                    <div class="border border-gray-200/50 rounded-xl p-3 bg-gradient-to-br from-purple-100/90 to-pink-100/90 backdrop-blur-sm relative shadow-md">
+                        <!-- Three dots menu button at top right -->
+                        <div class="absolute top-3 right-3">
+                            <button 
+                                class="text-gray-700 hover:text-gray-900 transition-colors duration-200"
+                                aria-label="Show podcast options"
+                                onclick={(e) => togglePodcastMenu(podcast.id, e)}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div class="flex gap-3 items-center">
+                            <!-- Podcast Icon/Play Button -->
+                            <div class="flex-shrink-0">
+                                <button 
+                                    class="w-10 h-10 {currentlyPlaying === podcast.id ? 'bg-gray-600' : 'bg-black'} hover:bg-gray-800 rounded-full flex items-center justify-center text-white transition-colors duration-200"
+                                    aria-label="{currentlyPlaying === podcast.id ? 'Pause' : 'Play'} podcast: {podcast.title}"
+                                    onclick={() => toggleAudio(podcast)}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        {#if currentlyPlaying === podcast.id}
+                                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                                        {:else}
+                                            <path d="M8 5v14l11-7z"/>
+                                        {/if}
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <!-- Podcast Details -->
+                            <div class="flex-grow overflow-hidden pr-6">
+                                <h3 class="font-medium text-base truncate">{podcast.title}</h3>
+                                <div class="text-xs text-gray-500">
+                                    <span>{podcast.source_emails} {podcast.source_emails === 1 ? 'source' : 'sources'}</span>
                                 </div>
                                 
-                                <div class="flex flex-col sm:flex-row gap-3 items-center sm:items-start">
-                                    <!-- Podcast Icon/Play Button -->
-                                    <div class="flex-shrink-0 self-center">
-                                        <button 
-                                            class="w-10 h-10 {currentlyPlaying === podcast.id ? 'bg-gray-600' : 'bg-black'} hover:bg-gray-800 rounded-full flex items-center justify-center text-white transition-colors duration-200"
-                                            aria-label="{currentlyPlaying === podcast.id ? 'Pause' : 'Play'} podcast: {podcast.title}"
-                                            onclick={() => toggleAudio(podcast)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                                {#if currentlyPlaying === podcast.id}
-                                                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                                                {:else}
-                                                    <path d="M8 5v14l11-7z"/>
-                                                {/if}
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    
-                                    <!-- Podcast Details -->
-                                    <div class="flex-grow overflow-hidden pr-6">
-                                        <h3 class="font-medium text-base truncate">{podcast.title}</h3>
-                                        <div class="text-xs text-gray-500">
-                                            <span>{podcast.source_emails} {podcast.source_emails === 1 ? 'source' : 'sources'}</span>
+                                <!-- Audio Progress Bar - only show for active podcast -->
+                                {#if activePlayerPodcast?.id === podcast.id}
+                                    <div class="mt-3 w-full">
+                                        <div class="flex justify-between text-xs text-gray-700 mb-1">
+                                            <span>{formatDuration(Math.floor(currentProgress))}</span>
+                                            <span>{formatDuration(Math.floor(audioDuration))}</span>
                                         </div>
-                                        
-                                        <!-- Audio Progress Bar - only show for active podcast -->
-                                        {#if activePlayerPodcast?.id === podcast.id}
-                                            <div class="mt-3 w-full">
-                                                <div class="flex justify-between text-xs text-gray-700 mb-1">
-                                                    <span>{formatDuration(Math.floor(currentProgress))}</span>
-                                                    <span>{formatDuration(Math.floor(audioDuration))}</span>
-                                                </div>
-                                                <input 
-                                                    type="range" 
-                                                    min="0" 
-                                                    max={audioDuration || podcast.duration} 
-                                                    value={currentProgress} 
-                                                    oninput={handleSeek}
-                                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-800"
-                                                />
-                                            </div>
-                                        {/if}
-                                    </div>
-                                </div>
-                                {#if showPodcastMenuId === podcast.id}
-                                    <div 
-                                        class="absolute left-full bottom-0 top-auto ml-4 w-12 bg-white/40 backdrop-blur-md rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-[9999] p-1 flex flex-col items-center space-y-2"
-                                        role="menu"
-                                        aria-orientation="vertical"
-                                        aria-labelledby="options-menu"
-                                    >
-                                        <button 
-                                            class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
-                                            role="menuitem"
-                                            aria-label="Download"
-                                            onclick={() => handleDownload(podcast)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                            </svg>
-                                        </button>
-                                        <button 
-                                            class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
-                                            role="menuitem"
-                                            aria-label="Share"
-                                            onclick={() => handleShare(podcast)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-                                            </svg>
-                                        </button>
-                                        <button 
-                                            class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-100 transition-colors"
-                                            role="menuitem"
-                                            aria-label="Delete"
-                                            onclick={() => deletePodcast(podcast.id)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                            </svg>
-                                        </button>
+                                        <input 
+                                            type="range" 
+                                            min="0" 
+                                            max={audioDuration || podcast.duration} 
+                                            value={currentProgress} 
+                                            oninput={handleSeek}
+                                            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-800"
+                                        />
                                     </div>
                                 {/if}
                             </div>
-                        {/each}
+                        </div>
+                        {#if showPodcastMenuId === podcast.id}
+                            <div 
+                                class="absolute left-full top-0 ml-2 flex flex-col items-center space-y-1 z-[9999]"
+                                role="menu"
+                                aria-orientation="vertical"
+                                aria-labelledby="options-menu"
+                            >
+                                <button 
+                                    class="w-6 h-6 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white transition-colors"
+                                    role="menuitem"
+                                    aria-label="Download"
+                                    onclick={() => handleDownload(podcast)}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                <button 
+                                    class="w-6 h-6 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white transition-colors"
+                                    role="menuitem"
+                                    aria-label="Share"
+                                    onclick={() => handleShare(podcast)}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                                    </svg>
+                                </button>
+                                <button 
+                                    class="w-6 h-6 flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-red-50 transition-colors"
+                                    role="menuitem"
+                                    aria-label="Delete"
+                                    onclick={() => deletePodcast(podcast.id)}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        {/if}
                     </div>
-                {/if}
+                {/each}
             </div>
-        </div>
+        {/if}
     </div>
 </div> 
