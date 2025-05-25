@@ -2,7 +2,7 @@
 export const API_CONFIG = {
   // Use Render backend in production, local in development
   baseUrl: import.meta.env.PROD 
-    ? 'https://audiobrew-api.onrender.com'  // Replace with your actual Render URL
+    ? 'https://audiobrew-backend.onrender.com'  // Your actual Render URL
     : 'http://localhost:8000',
   timeout: 30000,
   
