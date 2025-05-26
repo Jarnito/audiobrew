@@ -3,7 +3,9 @@ const urlsToCache = [
   '/',
   '/dashboard',
   '/audiobrew_logo.png',
-  '/favicon.png'
+  '/favicon.png',
+  '/audiobrew_192px.png',
+  '/audiobrew_512px.png'
 ];
 
 // Install event - cache core files

@@ -42,7 +42,7 @@ export async function downloadPodcast(podcast: Podcast): Promise<string | null> 
         // Create a temporary link element for download
         const link = document.createElement('a');
         link.href = blobUrl;
-        link.download = `${podcast.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp3`;
+        link.download = `${podcast.title.replace(/[<>:"/\\|?*]/g, '').trim()}.mp3`;
         
         // Trigger download immediately
         document.body.appendChild(link);
@@ -85,7 +85,7 @@ export async function sharePodcast(podcast: Podcast): Promise<string | null> {
         }
         
         const blob = await response.blob();
-        const fileName = `${podcast.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp3`;
+        const fileName = `${podcast.title.replace(/[<>:"/\\|?*]/g, '').trim()}.mp3`;
         
         // Create a File object from the blob
         const file = new File([blob], fileName, { type: 'audio/mpeg' });
