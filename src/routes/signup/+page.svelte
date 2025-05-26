@@ -44,7 +44,7 @@
 </script>
 
 {#if page.form?.success}
-<div class="max-w-xl mx-auto p-7 bg-white rounded-2xl shadow-lg flex flex-col items-center h-full">
+<div class="max-w-xl mx-auto p-7 bg-white/25 backdrop-blur-sm rounded-2xl shadow-lg flex flex-col items-center h-full">
   <div class="bg-green-50 border border-green-200 text-green-600 px-4 py-3 my-6 rounded-md">
     <p class="text-sm font-medium">Check your email</p>
     <p class="text-sm mt-1">We've sent you a verification link to complete your signup.</p>
@@ -53,7 +53,7 @@
 {:else}
   
   <div class="flex items-center justify-center min-h-[calc(100vh-9rem)] px-4">
-    <div class="w-full max-w-[400px] mx-auto p-7 bg-white rounded-2xl shadow-lg flex flex-col">
+    <div class="w-full max-w-[400px] mx-auto p-7 bg-white/35 backdrop-blur-sm rounded-2xl shadow-lg flex flex-col">
       <!-- Title and subtitle -->
       <h2 class="text-3xl font-bold mb-9 text-center">Create your account</h2>
       

@@ -26,7 +26,7 @@
 </script>
 
 <div class="flex items-center justify-center min-h-[calc(100vh-9rem)] px-4">
-  <div class="w-full max-w-[400px] mx-auto p-7 bg-white rounded-2xl shadow-lg flex flex-col items-center">
+  <div class="w-full max-w-[400px] mx-auto p-7 bg-white/35 backdrop-blur-sm rounded-2xl shadow-lg flex flex-col items-center">
     <h2 class="text-3xl font-bold mb-9 text-center">Log in</h2>
     
     <!-- Google button -->

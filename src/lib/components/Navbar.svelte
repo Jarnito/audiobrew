@@ -24,7 +24,8 @@
     <div class="flex items-center gap-2">
         <a
             href="/"
-            class="text-xl font-bold tracking-tight text-gray-800 transition hover:text-blue-600">
+            class="flex items-center gap-2 text-xl font-bold tracking-tight text-gray-800">
+            <img src="/audiobrew_logo.png" alt="AudioBrew Logo" class="h-8 w-8" />
             AudioBrew
         </a>
     </div>
