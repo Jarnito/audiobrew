@@ -92,8 +92,8 @@
             
             if (response.ok) {
                 const data = await response.json();
-                if (data.auth_url) {
-                    window.location.href = data.auth_url;
+                if (data.authorization_url) {
+                    window.location.href = data.authorization_url;
                 } else {
                     error = 'No authorization URL received';
                 }
